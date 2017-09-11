@@ -49,8 +49,8 @@ func main() {
 		},
 	)
 
+	log.Printf(" [x] Sent %s", body)
 	failOnError(err, "Failed to publish a message")
-
 }
 
 func connect(connStr string) *amqp.Connection {
