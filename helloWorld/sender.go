@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 
 	"github.com/streadway/amqp"
@@ -41,18 +40,17 @@ func main() {
 
 	failOnError(err, "Failed to declare a queue")
 
-	enter := make(chan bool)
+	enter := make(chan string)
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool)
-	count := 0
 
 	go func() {
 
 		fmt.Println("Hit `Enter` to send a message")
 		for {
 			reader := bufio.NewReader(os.Stdin)
-			_, _ = reader.ReadString('\n')
-			enter <- true
+			str, _ := reader.ReadString('\n')
+			enter <- str
 		}
 	}()
 
@@ -62,9 +60,8 @@ func main() {
 
 		for {
 			select {
-			case _ = <-enter:
-				body := strconv.Itoa(count)
-				count++
+			case line := <-enter:
+				body := []byte(line)
 				err = ch.Publish(
 					"",     // exchange
 					q.Name, // routing key
