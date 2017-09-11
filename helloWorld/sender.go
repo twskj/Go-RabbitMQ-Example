@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 
 	"github.com/streadway/amqp"
 )
@@ -36,21 +41,52 @@ func main() {
 
 	failOnError(err, "Failed to declare a queue")
 
-	body := "hello"
+	enter := make(chan bool)
+	sigs := make(chan os.Signal, 1)
+	done := make(chan bool)
+	count := 0
 
-	err = ch.Publish(
-		"",     // exchange
-		q.Name, // routing key
-		false,  // mandatory
-		false,  // immediate
-		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(body),
-		},
-	)
+	go func() {
 
-	log.Printf(" [x] Sent %s", body)
-	failOnError(err, "Failed to publish a message")
+		fmt.Println("Hit `Enter` to send a message")
+		for {
+			reader := bufio.NewReader(os.Stdin)
+			_, _ = reader.ReadString('\n')
+			enter <- true
+		}
+	}()
+
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+
+		for {
+			select {
+			case _ = <-enter:
+				body := strconv.Itoa(count)
+				count++
+				err = ch.Publish(
+					"",     // exchange
+					q.Name, // routing key
+					false,  // mandatory
+					false,  // immediate
+					amqp.Publishing{
+						ContentType: "text/plain",
+						Body:        []byte(body),
+					},
+				)
+
+				log.Printf(" [x] Sent %s", body)
+				failOnError(err, "Failed to publish a message")
+
+			case _ = <-sigs:
+				done <- true
+			}
+		}
+	}()
+
+	<-done
+	log.Printf("bye")
 }
 
 func connect(connStr string) *amqp.Connection {
