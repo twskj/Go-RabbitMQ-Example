@@ -64,6 +64,7 @@ func main() {
 			}
 			time.Sleep(time.Millisecond * time.Duration(num))
 			log.Printf("Done")
+			d.Ack(false) // false = single item mode , true = batch mode
 		}
 	}()
 
