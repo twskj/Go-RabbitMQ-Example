@@ -34,12 +34,21 @@ func main() {
 
 	q, err := ch.QueueDeclare(
 		"workQueues", // name
-		false,        // durable
+		true,         // durable
 		false,        // delete when usused
 		false,        // exclusive
 		false,        // no-wait
 		nil,          // arguments
 	)
+
+	// uncomment will gauranty fair dispatch for each worker
+	// err = ch.Qos(
+	// 	1,     // prefetch count
+	// 	0,     // prefetch size
+	// 	false, // global
+	// )
+	// failOnError(err, "Failed to set QoS")
+
 	failOnError(err, "Failed to declare a queue")
 
 	msgs, err := ch.Consume(
