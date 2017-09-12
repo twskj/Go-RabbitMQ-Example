@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/streadway/amqp"
@@ -23,7 +24,13 @@ func connect(connStr string) *amqp.Connection {
 
 func main() {
 
-	connStr := "amqp://guest:guest@localhost:5672/"
+	buff, err := ioutil.ReadFile("conn.txt")
+	if err != nil {
+		fmt.Println("Use local RabbitMQ")
+		buff = []byte("amqp://guest:guest@localhost:5672/")
+	}
+
+	connStr := string(buff)
 	conn := connect(connStr)
 
 	ch, err := conn.Channel()
