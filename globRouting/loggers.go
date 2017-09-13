@@ -31,8 +31,8 @@ func main() {
 	rndSrc := rand.NewSource(time.Now().UnixNano())
 	rnd := rand.New(rndSrc)
 
-	allLogLevel := []string{"INFO", "WARN", "ERROR", "FATAL"}
-	allSource := []string{"HTTP", "DB", "FS", "OTHER"}
+	allLogLevel := []string{"INFO:", "WARN:", "ERROR:", "FATAL:", "*"}
+	allSource := []string{"HTTP", "DB", "FS", "OTHER", "*"}
 
 	logLevel := 0
 	if len(os.Args) != 3 {
@@ -113,8 +113,8 @@ func main() {
 	// binding refers to a connection between Exchange and Queue
 	err = ch.QueueBind(
 		q.Name, // queue name
-		allSource[srcIdx]+"."+allLogLevel[logLevel]+":", // routing key <-- no routing key
-		"glob_routing",                                  // exchange
+		allSource[srcIdx]+"."+allLogLevel[logLevel], // routing key <-- no routing key
+		"glob_routing",                              // exchange
 		false,
 		nil,
 	)
