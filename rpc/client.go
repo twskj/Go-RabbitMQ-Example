@@ -63,36 +63,23 @@ func main() {
 	)
 	failOnError(err, "Failed to declare a queue")
 
-	resultsQueue, err := ch.Consume(
-		callbackQueue.Name, // queue
-		"",                 // consumer
-		true,               // auto-ack
-		false,              // exclusive
-		false,              // no-local
-		false,              // no-wait
-		nil,                // args
-	)
-
-	failOnError(err, "Fail to register callback consumer")
-
 	enter := make(chan string)
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool)
 
 	go func() {
-
 		allFunctions := []string{"fac", "sum", "mul"}
 		n := len(allFunctions)
 		ticker := time.NewTicker(time.Millisecond * 1000)
 		for _ = range ticker.C {
 			tmp := rnd.Int() % n
 			val := ""
-			switch allFunctions[n] {
-			case "sleep":
-				val = strconv.Itoa(rnd.Intn(5000))
+			switch allFunctions[tmp] {
+			case "fac":
+				val = strconv.Itoa(rnd.Intn(20))
+				enter <- fmt.Sprintf("%v %v", allFunctions[tmp], val)
 			case "sum", "mul":
-				val = strconv.Itoa(rnd.Intn(5000)) + " " + strconv.Itoa(rnd.Intn(5000))
-				enter <- fmt.Sprintf("%v(%v)", allFunctions[tmp], val)
+				enter <- fmt.Sprintf("%v %v %v", allFunctions[tmp], strconv.Itoa(rnd.Intn(5000)), strconv.Itoa(rnd.Intn(5000)))
 			}
 		}
 	}()
@@ -101,6 +88,7 @@ func main() {
 
 	go func() {
 
+		i := 1
 		for {
 			select {
 			case line := <-enter:
@@ -112,12 +100,13 @@ func main() {
 					false, // immediate
 					amqp.Publishing{
 						ContentType:   "text/plain",
-						CorrelationId: randomString(32),
+						CorrelationId: callbackQueue.Name + "-" + strconv.Itoa(i),
 						ReplyTo:       callbackQueue.Name,
 						Body:          body,
 					},
 				)
-				log.Printf(" [x] Call: %s", body)
+				log.Printf("[%v-%v] Call: %s", callbackQueue.Name, strconv.Itoa(i), body)
+				i++
 				failOnError(err, "Failed to publish a message")
 
 			case _ = <-sigs:
@@ -127,8 +116,18 @@ func main() {
 	}()
 
 	go func() {
+		resultsQueue, err := ch.Consume(
+			callbackQueue.Name, // queue
+			"",                 // consumer
+			true,               // auto-ack
+			false,              // exclusive
+			false,              // no-local
+			false,              // no-wait
+			nil,                // args
+		)
+		failOnError(err, "Fail to register callback consumer")
 		for result := range resultsQueue {
-			log.Printf("Job %v = %v", result.CorrelationId, result.Body)
+			log.Printf("Job %v = %v", result.CorrelationId, string(result.Body))
 		}
 	}()
 

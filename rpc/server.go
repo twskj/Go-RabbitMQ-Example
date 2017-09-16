@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/streadway/amqp"
 )
@@ -28,8 +26,8 @@ func connect(connStr string) *amqp.Connection {
 
 func main() {
 
-	rndSrc := rand.NewSource(time.Now().UnixNano())
-	rnd := rand.New(rndSrc)
+	// rndSrc := rand.NewSource(time.Now().UnixNano())
+	// rnd := rand.New(rndSrc)
 
 	buff, err := ioutil.ReadFile("conn.txt")
 	if err != nil {
@@ -69,16 +67,43 @@ func main() {
 
 	go func() {
 		for msg := range msgs {
+
 			cmd := string(msg.Body)
+			log.Printf("Received: %v", cmd)
 			tokens := strings.Fields(cmd)
 
 			switch tokens[0] {
 			case "fac":
-				sendResult(fib(token[1]))
+				val, err := strconv.Atoi(tokens[1])
+				if err != nil {
+					sendResult(ch, "ERROR", msg.ReplyTo, msg.CorrelationId)
+				} else {
+					sendResult(ch, strconv.Itoa(factorial(val)), msg.ReplyTo, msg.CorrelationId)
+				}
 			case "sum":
-				sendResult(sum(token[1], token[2]))
+				val1, err := strconv.Atoi(tokens[1])
+				if err != nil {
+					sendResult(ch, "ERROR", msg.ReplyTo, msg.CorrelationId)
+					continue
+				}
+				val2, err := strconv.Atoi(tokens[2])
+				if err != nil {
+					sendResult(ch, "ERROR", msg.ReplyTo, msg.CorrelationId)
+					continue
+				}
+				sendResult(ch, strconv.Itoa(sum(val1, val2)), msg.ReplyTo, msg.CorrelationId)
 			case "mul":
-				sendResult(mul(token[1], token[2]))
+				val1, err := strconv.Atoi(tokens[1])
+				if err != nil {
+					sendResult(ch, "ERROR", msg.ReplyTo, msg.CorrelationId)
+					continue
+				}
+				val2, err := strconv.Atoi(tokens[2])
+				if err != nil {
+					sendResult(ch, "ERROR", msg.ReplyTo, msg.CorrelationId)
+					continue
+				}
+				sendResult(ch, strconv.Itoa(mul(val1, val2)), msg.ReplyTo, msg.CorrelationId)
 			}
 		}
 	}()
@@ -92,17 +117,30 @@ func factorial(num int) int {
 		return 1
 	}
 
-	return num * factorial(n-1)
+	return num * factorial(num-1)
 }
 
 func sum(x1, x2 int) int {
-	return strconv.Atoi(x1) + strconv.Atoi(x2)
+	return x1 + x2
 }
 
 func mul(x1, x2 int) int {
-	return strconv.Atoi(x1) * strconv.Atoi(x2)
+	return x1 * x2
 }
 
-func sendResult(result string) {
-
+func sendResult(ch *amqp.Channel, result, replyTo, ID string) {
+	body := []byte(result)
+	err := ch.Publish(
+		"",      // exchange
+		replyTo, // routing key
+		false,   // mandatory
+		false,   // immediate
+		amqp.Publishing{
+			ContentType:   "text/plain",
+			CorrelationId: ID,
+			Body:          body,
+		},
+	)
+	log.Printf(" [x] Call: %s", body)
+	failOnError(err, "Failed to publish a message")
 }
